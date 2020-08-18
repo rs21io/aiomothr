@@ -1,1 +1,1 @@
-include mothrpy/schema.graphql
+include aiomothr/schema.graphql
