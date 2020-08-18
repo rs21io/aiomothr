@@ -1,0 +1,187 @@
+type Job {
+  "Unique identifier for the job"
+  jobId: ID!
+  "The service executed"
+  service: String
+  "The version of the service executed"
+  version: String
+  "The queue that the job was placed in"
+  queue: String
+  "The current status of the job"
+  status: JobStatus!
+  "Execution parameters sent to the service"
+  parameters: [Parameter]
+  "Additional inputs needed by the service not specified in parameters"
+  inputs: [String]
+  "Addtional outputs produced by the service not specified in parameters"
+  outputs: [String]
+  "Channels to broadcast the job messages and result to"
+  broadcast: [String]
+  "The worker instance that executed the job"
+  worker: Worker
+  "The time the user submitted the job"
+  submittedAt: Date
+  "The time, in seconds, the job took executing"
+  runTime: Float
+  "The time, in seconds, the job spent sitting in the queue"
+  waitTime: Float
+  "Value to input directly into the service"
+  inputStream: String
+  "The output produced by the job"
+  result: String
+  "Errors produced by the job"
+  error: String
+  "The system exit code returned by the job"
+  exitCode: Int
+  "Intermediate messages produced during job execution"
+  messages: [String]
+  "Unique service ID"
+  serviceId: String
+  "Service creation date"
+  serviceCreationDate: Date
+  "User who requested to job"
+  user: User
+  "Additional metadata attached to output files"
+  outputMetadata: [Metadata]
+  "Maximum memory used during job execution"
+  maxMemory: Int
+  "Number of CPUs available on the worker"
+  numCpu: Int
+  "Total amount of CPU usage"
+  cpuUsage: Int
+}
+
+type Metadata {
+  key: String!
+  value: String!
+}
+type Parameter {
+  type: ParameterType!
+  "Name of the parameter, e.g., `-i`, `--input`"
+  name: String
+  "Value of the parameter"
+  value: ParameterValue!
+  delimiter: String
+}
+
+type User {
+  username: ID!
+  roles: [String]
+}
+
+type Worker {
+  workerId: ID!
+  instance: String
+  queue: String
+}
+
+enum ParameterType {
+  "`input` parameters will be downloaded prior to execution"
+  input
+  "`output` parameters will be uploaded after execution"
+  output
+  "`parameter` parameters will simply be passed through"
+  parameter
+}
+
+enum JobStatus {
+  "Job has been placed in the queue"
+  submitted
+  "Job is actively running"
+  running
+  "Job was cancelled"
+  cancelled
+  "Job failed"
+  failed
+  "Job completed successfully"
+  complete
+}
+
+enum Order {
+  "Order ascending"
+  asc
+  "Order descending"
+  desc
+}
+
+enum OrderBy {
+  service
+  submittedAt
+}
+
+scalar Date
+scalar ParameterValue
+
+input ParameterInput {
+  type: ParameterType
+  name: String
+  value: ParameterValue
+  delimiter: String
+}
+
+input MetadataInput {
+  key: String!
+  value: String!
+}
+
+input JobRequest {
+  "The service to run"
+  service: String!
+  "The version of the service to run"
+  version: String
+  "The queue to place the request in"
+  queue: String
+  "Parameters to pass to the service"
+  parameters: [ParameterInput]
+  "String to pipe directly into the service"
+  inputStream: String
+  "Additional inputs not specified in `parameters`"
+  inputs: [String]
+  "Additional outputs not specified in `parameters`"
+  outputs: [String]
+  "Channels to publish the job messages and results"
+  broadcast: [String]
+  "Additional metadata to attach to output files"
+  outputMetadata: [MetadataInput]
+}
+
+type JobRequestResponse {
+  job: Job
+}
+
+type LoginResponse {
+  refresh: String
+  token: String
+}
+
+type RefreshResponse {
+  token: String
+}
+
+type Query {
+  job(jobId: ID!): Job
+  jobs(
+    status: JobStatus
+    service: String
+    order: Order
+    orderBy: OrderBy
+    limit: Int
+  ): [Job]
+}
+
+type Mutation {
+  cancelJob(jobId: ID!): Job
+  login(username: String!, password: String!): LoginResponse
+  refresh(token: String!): RefreshResponse
+  submitJob(request: JobRequest!): JobRequestResponse
+}
+
+type Subscription {
+  subscribeJobMessages(jobId: ID!): String
+  subscribeJobComplete(jobId: ID!): Job
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+}

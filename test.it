@@ -1,0 +1,4 @@
+#! /bin/bash
+
+flake8 --ignore E252,E501,F401 aiomothr
+py.test test/ --mypy --cov aiomothr $@
