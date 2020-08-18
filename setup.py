@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='aiomothr',
-    version='1.2.4',
+    version='0.1.0',
     author='James Arnold',
     author_email='james@rs21.io',
     description='Asynchronous client library for interacting with MOTHR',
@@ -11,7 +11,7 @@ setuptools.setup(
     install_requires=[
         'aioredis',
         'gql==3.0.0a1',
-        'mothrpy>=1.3.0',
+        'mothrpy>=0.1.0',
     ],
     extras_require={
         'dev': [
