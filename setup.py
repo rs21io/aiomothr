@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='aiomothr',
-    version='0.1.1',
+    version='0.1.2',
     author='James Arnold',
     author_email='james@rs21.io',
     description='Asynchronous client library for interacting with MOTHR',
