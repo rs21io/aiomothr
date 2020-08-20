@@ -7,15 +7,16 @@ import asyncio
 import os
 from gql import gql, AIOHTTPTransport, Client, WebsocketsTransport
 from gql.dsl import DSLSchema
-from urllib.parse import urlsplit, urlunsplit
+from mothrpy import JobRequest
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlsplit, urlunsplit
 
 
 with open(os.path.join(os.path.realpath(os.path.dirname(__file__)), 'schema.graphql')) as f:
     schema = f.read()
 
 
-class AsyncJobRequest:
+class AsyncJobRequest(JobRequest):
     """Object used for submitting asynchronous requests to mothr
 
     Attributes:
