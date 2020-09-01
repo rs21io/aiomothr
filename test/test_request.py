@@ -29,8 +29,8 @@ class TestJob:
         ]
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate')
-    @patch('gql.dsl.DSLSchema.query')
+    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
+    @patch('gql.dsl.DSLSchema.query', new_callable=CoroutineMock)
     async def test_run_job(self, mock_query, mock_mutate):
         mock_mutate.return_value = self.submit_response
         mock_query.side_effect = self.query_response
@@ -39,8 +39,8 @@ class TestJob:
         assert(result)
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate')
-    @patch('gql.dsl.DSLSchema.query')
+    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
+    @patch('gql.dsl.DSLSchema.query', new_callable=CoroutineMock)
     async def test_run_job_fail(self, mock_query, mock_mutate):
         for i in [-1, -2]:
             self.query_response[i]['job']['status'] = 'failed'
@@ -52,8 +52,8 @@ class TestJob:
             result = await request.run_job()
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate')
-    @patch('gql.dsl.DSLSchema.query')
+    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
+    @patch('gql.dsl.DSLSchema.query', new_callable=CoroutineMock)
     async def test_run_job_fail_return_failed(self, mock_query, mock_mutate):
         for i in [-1, -2]:
             self.query_response[i]['job']['status'] = 'failed'
@@ -82,7 +82,7 @@ class TestJob:
         assert(messages[0] == 'message 1')
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate')
+    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
     async def test_login(self, mock_mutate):
         mock_mutate.return_value = {'login':{'token':'access-token','refresh':'refresh-token'}}
         request = AsyncJobRequest(service='test')
@@ -91,7 +91,7 @@ class TestJob:
         assert(refresh == 'refresh-token')
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate')
+    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
     async def test_refresh(self, mock_mutate):
         mock_mutate.return_value = {'refresh':{'token':'access-token'}}
         request = AsyncJobRequest(service='test')
