@@ -115,7 +115,7 @@ class AsyncJobRequest(JobRequest):
                      ds.LoginResponse.refresh))
         async with Client(transport=self.transport, schema=schema) as sess:
             ds = DSLSchema(sess)
-            resp = ds.mutate(q)
+            resp = await ds.mutate(q)
         tokens = resp['login']
         if tokens is None:
             raise ValueError('Login failed')
@@ -142,7 +142,7 @@ class AsyncJobRequest(JobRequest):
             q = (ds.Mutation.refresh.args(token=refresh))
             async with Client(transport=self.transport, schema=schema) as sess:
                 ds = DSLSchema(sess)
-                resp = ds.mutate(q)
+                resp = await ds.mutate(q)
             if resp['refresh'] is None:
                 raise ValueError('Token refresh failed')
             token = resp['refresh']['token']
@@ -165,7 +165,7 @@ class AsyncJobRequest(JobRequest):
                              ds.Job.status)))
         async with Client(transport=self.transport, schema=schema) as sess:
             ds = DSLSchema(sess)
-            resp = ds.mutate(q)
+            resp = await ds.mutate(q)
         if 'errors' in resp:
             raise ValueError('Error submitting job request: ' + resp['errors'])
         self.job_id = resp['submitJob']['job']['jobId']
@@ -193,7 +193,7 @@ class AsyncJobRequest(JobRequest):
         q = ds.Query.job.args(jobId=self.job_id).select(*fields)
         async with Client(transport=self.transport, schema=schema) as sess:
             ds = DSLSchema(sess)
-            resp = ds.query(q)
+            resp = await ds.query(q)
         return resp['job']
 
     async def check_status(self) -> str:
