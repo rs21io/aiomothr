@@ -2,13 +2,14 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
-import aioredis
 import asyncio
 import os
-from aioredis.pubsub import Receiver
 from typing import List
 
-REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+import aioredis
+from aioredis.pubsub import Receiver
+
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
 
 
 class Listener:
@@ -23,17 +24,20 @@ class Listener:
             wildcard (e.g., channel:*) which will listen to all channels that start
             with "channel:".
     """
+
     def __init__(self, channels: List[str]) -> None:
         loop = asyncio.get_event_loop()
-        db = loop.run_until_complete(aioredis.create_redis(f'redis://{REDIS_HOST}'))
+        db = loop.run_until_complete(aioredis.create_redis(f"redis://{REDIS_HOST}"))
         pubsub = Receiver(loop=loop)
 
         if isinstance(channels, str):
             channels = [channels]
-        subs = [pubsub.channel(channel)
-                for channel in channels if not channel.endswith('*')]
-        pattern_subs = [pubsub.pattern(channel)
-                        for channel in channels if channel.endswith('*')]
+        subs = [
+            pubsub.channel(channel) for channel in channels if not channel.endswith("*")
+        ]
+        pattern_subs = [
+            pubsub.pattern(channel) for channel in channels if channel.endswith("*")
+        ]
         if len(subs) > 0:
             loop.run_until_complete(db.subscribe(*subs))
         if len(pattern_subs) > 0:
@@ -50,7 +54,7 @@ class Listener:
             channel (str): Name of the channel on which the message was received
             message (str): The message received on the channel
         """
-        raise NotImplementedError('You must override handle_message to use this class')
+        raise NotImplementedError("You must override handle_message to use this class")
 
     async def run(self) -> None:
         """Listen for messages on subscribed channels"""
@@ -60,21 +64,30 @@ class Listener:
                 message = message[1]
             else:
                 channel = channel.name
-            asyncio.create_task(
-                self.handle_message(channel.decode(), message.decode())
-            )
+            asyncio.create_task(self.handle_message(channel.decode(), message.decode()))
 
     def start(self) -> None:
-        print('Starting listener')
+        """Start listener"""
+        print("Starting listener")
         try:
             loop = asyncio.get_event_loop()
             loop.run_until_complete(self.run())
         except KeyboardInterrupt:
-            print('Stopping Listener')
+            print("Stopping Listener")
         finally:
             # Unsubscribe from channels
-            db = loop.run_until_complete(aioredis.create_redis(f'redis://{REDIS_HOST}'))
-            map(lambda channel: loop.run_until_complete(db.unsubscribe(channel=channel)), self.subs)
-            map(lambda pattern: loop.run_until_complete(db.punsubscribe(pattern=pattern)), self.psubs)
+            db = loop.run_until_complete(aioredis.create_redis(f"redis://{REDIS_HOST}"))
+            map(
+                lambda channel: loop.run_until_complete(
+                    db.unsubscribe(channel=channel)
+                ),
+                self.subs,
+            )
+            map(
+                lambda pattern: loop.run_until_complete(
+                    db.punsubscribe(pattern=pattern)
+                ),
+                self.psubs,
+            )
             self.pubsub.stop()
             loop.close()
