@@ -336,6 +336,6 @@ class AsyncJobRequest:
             await asyncio.sleep(poll_frequency)
 
         result = await self.result()
-        if status != "complete" or return_failed is False:
+        if status != "complete" and return_failed is False:
             raise RuntimeError("Job {} failed: {}".format(job_id, result["error"]))
         return result
