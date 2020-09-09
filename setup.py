@@ -11,7 +11,6 @@ setuptools.setup(
     install_requires=[
         "aioredis",
         "gql==3.0.0a1",
-        "mothrpy>=0.1.0",
     ],
     extras_require={
         "dev": ["asynctest", "pytest", "pytest-asyncio", "pytest-cov", "pytest-mypy"]
