@@ -1,5 +1,5 @@
 import pytest
-from aiomothr import AsyncJobRequest
+from aiomothr import AsyncJobRequest, AsyncMothrClient
 from asynctest import CoroutineMock, MagicMock, patch
 
 
@@ -20,82 +20,90 @@ class AsyncIterator:
 
 class TestJob:
     def setup_method(self, _):
-        self.submit_response = {'submitJob': {'job': {'jobId': 'test', 'status': 'submitted'}}}
+        self.submit_response = {
+            "submitJob": {"job": {"jobId": "test", "status": "submitted"}}
+        }
         self.query_response = [
-            {'job': {'status': 'submitted'}}, 
-            {'job': {'status': 'running'}}, 
-            {'job': {'status': 'complete'}}, 
-            {'job': {'status': 'complete'}}
+            {"job": {"status": "submitted"}},
+            {"job": {"status": "running"}},
+            {"job": {"status": "complete"}},
+            {"job": {"status": "complete"}},
         ]
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
-    @patch('gql.dsl.DSLSchema.query', new_callable=CoroutineMock)
+    @patch("gql.dsl.DSLSchema.mutate", new_callable=CoroutineMock)
+    @patch("gql.dsl.DSLSchema.query", new_callable=CoroutineMock)
     async def test_run_job(self, mock_query, mock_mutate):
         mock_mutate.return_value = self.submit_response
         mock_query.side_effect = self.query_response
-        request = AsyncJobRequest(service='test')
+        request = AsyncJobRequest(service="test")
         result = await request.run_job()
-        assert(result)
+        assert result
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
-    @patch('gql.dsl.DSLSchema.query', new_callable=CoroutineMock)
+    @patch("gql.dsl.DSLSchema.mutate", new_callable=CoroutineMock)
+    @patch("gql.dsl.DSLSchema.query", new_callable=CoroutineMock)
     async def test_run_job_fail(self, mock_query, mock_mutate):
         for i in [-1, -2]:
-            self.query_response[i]['job']['status'] = 'failed'
-            self.query_response[i]['job']['error'] = 'failed'
+            self.query_response[i]["job"]["status"] = "failed"
+            self.query_response[i]["job"]["error"] = "failed"
         mock_mutate.return_value = self.submit_response
-        mock_query.side_effect=self.query_response
-        request = AsyncJobRequest(service='test')
+        mock_query.side_effect = self.query_response
+        request = AsyncJobRequest(service="test")
         with pytest.raises(RuntimeError):
             result = await request.run_job()
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
-    @patch('gql.dsl.DSLSchema.query', new_callable=CoroutineMock)
+    @patch("gql.dsl.DSLSchema.mutate", new_callable=CoroutineMock)
+    @patch("gql.dsl.DSLSchema.query", new_callable=CoroutineMock)
     async def test_run_job_fail_return_failed(self, mock_query, mock_mutate):
         for i in [-1, -2]:
-            self.query_response[i]['job']['status'] = 'failed'
-            self.query_response[i]['job']['error'] = 'failed'
+            self.query_response[i]["job"]["status"] = "failed"
+            self.query_response[i]["job"]["error"] = "failed"
         mock_mutate.return_value = self.submit_response
         mock_query.side_effect = self.query_response
-        request = AsyncJobRequest(service='test')
+        request = AsyncJobRequest(service="test")
         result = await request.run_job(return_failed=True)
-        assert(result['error'] == 'failed')
+        assert result["error"] == "failed"
 
     @pytest.mark.asyncio
-    @patch('aiomothr.request.Client')
+    @patch("aiomothr.request.Client")
     async def test_subscribe(self, mock_client):
-        mock_client.return_value.__aenter__.return_value.subscribe.return_value = AsyncIterator(['test'])
-        request = AsyncJobRequest(service='test')
+        mock_client.return_value.__aenter__.return_value.subscribe.return_value = (
+            AsyncIterator(["test"])
+        )
+        request = AsyncJobRequest(service="test")
         result = await request.subscribe()
-        assert(result == 'test')
-        
+        assert result == "test"
+
     @pytest.mark.asyncio
-    @patch('aiomothr.request.Client')
+    @patch("aiomothr.request.Client")
     async def test_subscribe_messages(self, mock_client):
-        mock_client.return_value.__aenter__.return_value.subscribe.return_value = AsyncIterator([f'message {i+1}' for i in range(10)])
-        request = AsyncJobRequest(service='test')
+        mock_client.return_value.__aenter__.return_value.subscribe.return_value = (
+            AsyncIterator([f"message {i+1}" for i in range(10)])
+        )
+        request = AsyncJobRequest(service="test")
         messages = [m async for m in request.subscribe_messages()]
-        assert(len(messages) == 10)
-        assert(messages[0] == 'message 1')
+        assert len(messages) == 10
+        assert messages[0] == "message 1"
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
+    @patch("gql.dsl.DSLSchema.mutate", new_callable=CoroutineMock)
     async def test_login(self, mock_mutate):
-        mock_mutate.return_value = {'login':{'token':'access-token','refresh':'refresh-token'}}
-        request = AsyncJobRequest(service='test')
-        access, refresh = await request.login(username='test', password='password')
-        assert(access == 'access-token')
-        assert(refresh == 'refresh-token')
+        mock_mutate.return_value = {
+            "login": {"token": "access-token", "refresh": "refresh-token"}
+        }
+        request = AsyncJobRequest(service="test")
+        client = AsyncMothrClient()
+        access, refresh = await client.login(username="test", password="password")
+        assert access == "access-token"
+        assert refresh == "refresh-token"
 
     @pytest.mark.asyncio
-    @patch('gql.dsl.DSLSchema.mutate', new_callable=CoroutineMock)
+    @patch("gql.dsl.DSLSchema.mutate", new_callable=CoroutineMock)
     async def test_refresh(self, mock_mutate):
-        mock_mutate.return_value = {'refresh':{'token':'access-token'}}
-        request = AsyncJobRequest(service='test')
-        access = await request.refresh_token()
-        assert(access == 'access-token')
-
-
+        mock_mutate.return_value = {"refresh": {"token": "access-token"}}
+        client = AsyncMothrClient()
+        client.refresh = "refresh-token"
+        access = await client.refresh_token()
+        assert access == "access-token"

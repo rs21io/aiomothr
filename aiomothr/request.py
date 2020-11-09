@@ -9,8 +9,10 @@ import re
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
-from gql import gql, AIOHTTPTransport, Client, WebsocketsTransport
+from gql import gql, Client
 from gql.dsl import DSLSchema
+from gql.transport.aiohttp import AIOHTTPTransport
+from gql.transport.websockets import WebsocketsTransport
 
 
 with open(
@@ -19,24 +21,16 @@ with open(
     schema = f.read()
 
 
-class AsyncJobRequest:
-    """Object used for submitting asynchronous requests to mothr
+USERNAME_VAR = "MOTHR_USERNAME"
+PASSWORD_VAR = "MOTHR_PASSWORD"
+URL_VAR = "MOTHR_ENDPOINT"
+TOKEN_VAR = "MOTHR_ACCESS_TOKEN"
 
-    Attributes:
-        job_id (str): Request job id returned from self.submit()
-        status (str): Status of the job
+
+class AsyncMothrClient:
+    """Asynchronous client for connecting to MOTHR
 
     Args:
-        service (str): Service being invoked by the request
-        parameters (list<dict>, optional): Parameters to pass to the service
-        broadcast (str, optional): PubSub channel to broadcast the job result to
-        inputs (list<str>, optional): A list of S3 URIs to to be used as
-            inputs by the service
-        outputs (list<str>, optional): A list of S3 URIs to to be i
-            uploaded by the service
-        input_stream (str, optional): Value to pass to service through stdin
-        output_metadata (dict): Metadata attached to job outputs
-        version (str, optional): Version of the service, default `latest`
         url (str, optional): Endpoint to send the job request,
             checks for ``MOTHR_ENDPOINT`` in environment variables otherwise
             defaults to ``http://localhost:8080/query``
@@ -53,7 +47,7 @@ class AsyncJobRequest:
     def __init__(self, **kwargs):
         schemes = {"http": "ws", "https": "wss"}
         self.headers: Dict[str, str] = {}
-        endpoint = os.environ.get("MOTHR_ENDPOINT", "http://localhost:8080/query")
+        endpoint = os.getenv(URL_VAR, "http://localhost:8080/query")
         url = kwargs.pop("url", endpoint)
         split_url = urlsplit(url)
         ws_url = urlunsplit(split_url._replace(scheme=schemes[split_url.scheme]))
@@ -61,21 +55,104 @@ class AsyncJobRequest:
         self.transport = AIOHTTPTransport(url=url, headers=self.headers)
         self.ws_transport = WebsocketsTransport(url=ws_url)
 
-        token = kwargs.pop("token", os.environ.get("MOTHR_ACCESS_TOKEN"))
-        username = kwargs.pop("username", None)
-        password = kwargs.pop("password", None)
-        if username is None:
-            username = os.environ.get("MOTHR_USERNAME")
-        if password is None:
-            password = os.environ.get("MOTHR_PASSWORD")
-        if token is not None:
-            self.headers = {"Authorization": f"Bearer {token}"}
-        elif None not in (username, password):
+        self.token = kwargs.pop("token", os.getenv(TOKEN_VAR))
+        username = kwargs.pop("username", os.getenv(USERNAME_VAR))
+        password = kwargs.pop("password", os.getenv(PASSWORD_VAR))
+        if self.token is not None:
+            self.headers = {"Authorization": f"Bearer {self.token}"}
+        elif all((username, password)):
             loop = asyncio.get_event_loop()
-            token, refresh = loop.run_until_complete(self.login(username, password))
-            os.environ["MOTHR_REFRESH_TOKEN"] = refresh
-            self.headers = {"Authorization": f"Bearer {token}"}
+            self.token, self.refresh = loop.run_until_complete(
+                self.login(username, password)
+            )
+            self.headers = {"Authorization": f"Bearer {self.token}"}
 
+    async def login(
+        self, username: Optional[str] = None, password: Optional[str] = None
+    ) -> Tuple[str, Optional[str]]:
+        """Retrieve a web token from mothr
+
+        Args:
+            username (str, optional): Username used to login, the library will look
+                for ``MOTHR_USERNAME`` in the environment as a fallback.
+            password (str, optional): Password used to login, the library will look
+                for ``MOTHR_PASSWORD`` in the environment as a fallback.
+
+        Returns:
+            str: An access token to pass with future requests
+            str: A refresh token for receiving a new access token
+                after the current token expires
+
+        Raises:
+            ValueError: If a username or password are not provided and are not found
+                in the current environment
+        """
+        username = username if username is not None else os.getenv("MOTHR_USERNAME")
+        password = password if password is not None else os.getenv("MOTHR_PASSWORD")
+        if username is None:
+            raise ValueError("Username not provided")
+        if password is None:
+            raise ValueError("Password not provided")
+
+        credentials = {"username": username, "password": password}
+        client = Client(schema=schema)
+        ds = DSLSchema(client)
+        q = ds.Mutation.login.args(**credentials).select(
+            ds.LoginResponse.token, ds.LoginResponse.refresh
+        )
+        async with Client(transport=self.transport, schema=schema) as sess:
+            ds = DSLSchema(sess)
+            resp = await ds.mutate(q)
+        tokens = resp["login"]
+        if tokens is None:
+            raise ValueError("Login failed")
+        access = tokens["token"]
+        refresh = tokens["refresh"]
+        return access, refresh
+
+    async def refresh_token(self) -> str:
+        """Refresh an expired access token
+
+        Returns:
+            str: New access token
+        """
+        client = Client(schema=schema)
+        ds = DSLSchema(client)
+        q = ds.Mutation.refresh.args(token=self.refresh)
+        async with Client(transport=self.transport, schema=schema) as sess:
+            ds = DSLSchema(sess)
+            resp = await ds.mutate(q)
+        if resp["refresh"] is None:
+            raise ValueError("Token refresh failed")
+        token = resp["refresh"]["token"]
+        self.token = token
+        self.headers["Authorization"] = f"Bearer {self.token}"
+        return token
+
+
+class AsyncJobRequest:
+    """Object used for submitting asynchronous requests to mothr
+
+    Attributes:
+        job_id (str): Request job id returned from self.submit()
+        status (str): Status of the job
+
+    Args:
+        client (AsyncMothrClient): Client connection to use for requests
+        service (str): Service being invoked by the request
+        parameters (list<dict>, optional): Parameters to pass to the service
+        broadcast (str, optional): PubSub channel to broadcast the job result to
+        inputs (list<str>, optional): A list of S3 URIs to to be used as
+            inputs by the service
+        outputs (list<str>, optional): A list of S3 URIs to to be i
+            uploaded by the service
+        input_stream (str, optional): Value to pass to service through stdin
+        output_metadata (dict): Metadata attached to job outputs
+        version (str, optional): Version of the service, default `latest`
+    """
+
+    def __init__(self, **kwargs):
+        self.client = kwargs.pop("client", AsyncMothrClient())
         kwargs["parameters"] = kwargs.get("parameters", [])
         kwargs["outputMetadata"] = kwargs.get("output_metadata", {})
         self.req_args = kwargs
@@ -126,84 +203,6 @@ class AsyncJobRequest:
         self.req_args["outputMetadata"].update(metadata)
         return self
 
-    async def login(
-        self, username: Optional[str] = None, password: Optional[str] = None
-    ) -> Tuple[str, Optional[str]]:
-        """Retrieve a web token from mothr
-
-        Args:
-            username (str, optional): Username used to login, the library will look
-                for ``MOTHR_USERNAME`` in the environment as a fallback.
-            password (str, optional): Password used to login, the library will look
-                for ``MOTHR_PASSWORD`` in the environment as a fallback.
-
-        Returns:
-            str: An access token to pass with future requests
-            str: A refresh token for receiving a new access token
-                after the current token expires
-
-        Raises:
-            ValueError: If a username or password are not provided and are not found
-                in the current environment
-        """
-        token = os.environ.get("MOTHR_ACCESS_TOKEN")
-        if token is not None:
-            return token, None
-
-        username = (
-            username if username is not None else os.environ.get("MOTHR_USERNAME")
-        )
-        password = (
-            password if password is not None else os.environ.get("MOTHR_PASSWORD")
-        )
-        if username is None:
-            raise ValueError("Username not provided")
-        if password is None:
-            raise ValueError("Password not provided")
-
-        credentials = {"username": username, "password": password}
-        client = Client(schema=schema)
-        ds = DSLSchema(client)
-        q = ds.Mutation.login.args(**credentials).select(
-            ds.LoginResponse.token, ds.LoginResponse.refresh
-        )
-        async with Client(transport=self.transport, schema=schema) as sess:
-            ds = DSLSchema(sess)
-            resp = await ds.mutate(q)
-        tokens = resp["login"]
-        if tokens is None:
-            raise ValueError("Login failed")
-        access = tokens["token"]
-        refresh = tokens["refresh"]
-        os.environ["MOTHR_ACCESS_TOKEN"] = access
-        os.environ["MOTHR_REFRESH_TOKEN"] = refresh
-        return access, refresh
-
-    async def refresh_token(self) -> str:
-        """Refresh an expired access token
-
-        Returns:
-            str: New access token
-        """
-        current_token = self.headers.get("Authorization", "").split(" ")[-1]
-        system_token = os.getenv("MOTHR_ACCESS_TOKEN", "")
-        if current_token != system_token:
-            token = system_token
-        else:
-            refresh = os.getenv("MOTHR_REFRESH_TOKEN")
-            client = Client(schema=schema)
-            ds = DSLSchema(client)
-            q = ds.Mutation.refresh.args(token=refresh)
-            async with Client(transport=self.transport, schema=schema) as sess:
-                ds = DSLSchema(sess)
-                resp = await ds.mutate(q)
-            if resp["refresh"] is None:
-                raise ValueError("Token refresh failed")
-            token = resp["refresh"]["token"]
-            os.environ["MOTHR_ACCESS_TOKEN"] = token
-        self.headers["Authorization"] = f"Bearer {token}"
-        return token
-
     async def submit(self) -> str:
         """Submit a job request to the service endpoint
 
@@ -215,7 +214,7 @@ class AsyncJobRequest:
         q = ds.Mutation.submit_job.args(request=self.req_args).select(
             ds.JobRequestResponse.job.select(ds.Job.job_id, ds.Job.status)
         )
-        async with Client(transport=self.transport, schema=schema) as sess:
+        async with Client(transport=self.client.transport, schema=schema) as sess:
             ds = DSLSchema(sess)
             resp = await ds.mutate(q)
         if "errors" in resp:
@@ -243,7 +242,7 @@ class AsyncJobRequest:
         ds = DSLSchema(client)
         fields = [getattr(ds.Job, field) for field in fields]
         q = ds.Query.job.args(jobId=self.job_id).select(*fields)
-        async with Client(transport=self.transport, schema=schema) as sess:
+        async with Client(transport=self.client.transport, schema=schema) as sess:
             ds = DSLSchema(sess)
             resp = await ds.query(q)
         return resp["job"]
@@ -282,7 +281,7 @@ class AsyncJobRequest:
             }}
         """
         )
-        async with Client(transport=self.ws_transport, schema=schema) as sess:
+        async with Client(transport=self.client.ws_transport, schema=schema) as sess:
             result = [r async for r in sess.subscribe(s)]
         return result[0]
 
@@ -295,7 +294,7 @@ class AsyncJobRequest:
             }}
         """
         )
-        async with Client(transport=self.ws_transport, schema=schema) as sess:
+        async with Client(transport=self.client.ws_transport, schema=schema) as sess:
             async for result in sess.subscribe(s):
                 print(result)
                 yield result

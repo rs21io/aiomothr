@@ -9,11 +9,17 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
-        "aioredis",
-        "gql==3.0.0a1",
+        "gql[aiohttp,websockets]==3.0.0a4",
     ],
     extras_require={
-        "dev": ["asynctest", "pytest", "pytest-asyncio", "pytest-cov", "pytest-mypy"]
+        "dev": [
+            "asynctest",
+            "pytest",
+            "pytest-asyncio",
+            "pytest-cov",
+            "pytest-mypy",
+            "pytest-pylint",
+        ]
     },
     classifiers=[
         "Programming Language :: Python :: 3",
