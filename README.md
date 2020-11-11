@@ -2,6 +2,7 @@
 
 ![GitHub](https://img.shields.io/github/license/rs21io/aiomothr)
 ![Actions](https://github.com/rs21io/aiomothr/workflows/tests/badge.svg)
+[![codecov](https://codecov.io/gh/rs21io/aiomothr/branch/main/graph/badge.svg)](https://codecov.io/gh/rs21io/aiomothr)
 
 ## Installation
 `pip install aiomothr`
