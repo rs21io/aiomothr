@@ -28,3 +28,6 @@ jobs:
           python -m pip install --upgrade pip wheel
           pip install .[dev]
           py.test test/ --mypy --pylint aiomothr --cov aiomothr
+      - name: Upload code coverage
+        run: |
+          bash <(curl -s https://codecov.io/bash)
