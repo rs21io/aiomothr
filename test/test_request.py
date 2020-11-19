@@ -107,3 +107,33 @@ class TestJob:
         client.refresh = "refresh-token"
         access = await client.refresh_token()
         assert access == "access-token"
+
+    def test_method_chaining(self):
+        request = AsyncJobRequest(service="test")
+        request.add_input(value="s3://bucket/test.txt").add_output(
+            value="s3://bucket/test.txt"
+        ).add_parameter(value="baz").add_output_metadata({"foo": "bar"})
+        assert len(request.req_args["parameters"]) == 3
+        assert request.req_args["parameters"][0]["type"] == "input"
+        assert request.req_args["parameters"][1]["type"] == "output"
+        assert request.req_args["parameters"][2]["type"] == "parameter"
+        assert request.req_args["outputMetadata"]["foo"] == "bar"
+
+
+    def test_add_parameter_warn(self):
+        request = AsyncJobRequest(service="test")
+        request.job_id = "test"
+        with pytest.warns(UserWarning):
+            request.add_parameter(value="foo")
+
+    def test_add_input_warn(self):
+        request = AsyncJobRequest(service="test")
+        with pytest.warns(UserWarning):
+            request.add_input(value="foo")
+
+    def test_add_output_metadata_warn(self):
+        request = AsyncJobRequest(service="test")
+        request.job_id = "test"
+        with pytest.warns(UserWarning):
+            request.add_output_metadata({"foo": "bar"})
+

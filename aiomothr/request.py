@@ -8,6 +8,7 @@ import os
 import re
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
+from warnings import warn
 
 from gql import gql, Client
 from gql.dsl import DSLSchema
@@ -70,7 +71,7 @@ class AsyncMothrClient:
     async def login(
         self, username: Optional[str] = None, password: Optional[str] = None
     ) -> Tuple[str, Optional[str]]:
-        """Retrieve a web token from mothr
+        """Retrieve a web token from MOTHR
 
         Args:
             username (str, optional): Username used to login, the library will look
@@ -131,7 +132,7 @@ class AsyncMothrClient:
 
 
 class AsyncJobRequest:
-    """Object used for submitting asynchronous requests to mothr
+    """Class used for managing asynchronous job requests sent to MOTHR
 
     Attributes:
         job_id (str): Request job id returned from self.submit()
@@ -175,11 +176,13 @@ class AsyncJobRequest:
                 (`parameter`, `input`, `output`). Default `parameter`
             name (str, optional): Parameter name/flag (e.g., `-i`, `--input`)
         """
-        if param_type in ["input", "output"]:
-            if not self.is_s3_uri(value):
-                print(
-                    f"WARNING: parameter {value} of type {param_type} is not an S3 URI"
-                )
+        if self.job_id is not None:
+            warn(
+                "job has already been submitted, "
+                "adding additional parameters will have no effect"
+            )
+        if param_type in ["input", "output"] and not self.is_s3_uri(value):
+            warn(f"{param_type} parameter {value} is not an S3 URI")
         parameter = {"type": param_type, "value": value}
         if name is not None:
             parameter["name"] = name
@@ -200,6 +203,11 @@ class AsyncJobRequest:
         Args:
             metadata (dict)
         """
+        if self.job_id is not None:
+            warn(
+                "job has already been submitted, "
+                "adding additional output metadata will have no effect"
+            )
         self.req_args["outputMetadata"].update(metadata)
         return self
 
