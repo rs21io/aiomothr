@@ -1,11 +1,16 @@
 import setuptools
 
+with open("README.md") as f:
+    long_description = f.read()
+
 setuptools.setup(
     name="aiomothr",
     version="0.1.3",
     author="James Arnold",
     author_email="james@rs21.io",
     description="Asynchronous client library for interacting with MOTHR",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     packages=setuptools.find_packages(),
     include_package_data=True,
     install_requires=[
