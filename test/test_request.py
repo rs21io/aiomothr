@@ -87,27 +87,6 @@ class TestJob:
         assert len(messages) == 10
         assert messages[0] == "message 1"
 
-    @pytest.mark.asyncio
-    @patch("gql.dsl.DSLSchema.mutate", new_callable=CoroutineMock)
-    async def test_login(self, mock_mutate):
-        mock_mutate.return_value = {
-            "login": {"token": "access-token", "refresh": "refresh-token"}
-        }
-        request = AsyncJobRequest(service="test")
-        client = AsyncMothrClient()
-        access, refresh = await client.login(username="test", password="password")
-        assert access == "access-token"
-        assert refresh == "refresh-token"
-
-    @pytest.mark.asyncio
-    @patch("gql.dsl.DSLSchema.mutate", new_callable=CoroutineMock)
-    async def test_refresh(self, mock_mutate):
-        mock_mutate.return_value = {"refresh": {"token": "access-token"}}
-        client = AsyncMothrClient()
-        client.refresh = "refresh-token"
-        access = await client.refresh_token()
-        assert access == "access-token"
-
     def test_method_chaining(self):
         request = AsyncJobRequest(service="test")
         request.add_input(value="s3://bucket/test.txt").add_output(
@@ -118,7 +97,6 @@ class TestJob:
         assert request.req_args["parameters"][1]["type"] == "output"
         assert request.req_args["parameters"][2]["type"] == "parameter"
         assert request.req_args["outputMetadata"]["foo"] == "bar"
-
 
     def test_add_parameter_warn(self):
         request = AsyncJobRequest(service="test")
@@ -136,4 +114,3 @@ class TestJob:
         request.job_id = "test"
         with pytest.warns(UserWarning):
             request.add_output_metadata({"foo": "bar"})
-

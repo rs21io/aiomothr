@@ -20,7 +20,7 @@ type Job {
   "The worker instance that executed the job"
   worker: Worker
   "The time the user submitted the job"
-  submittedAt: Date
+  submittedAt: DateTime
   "The time, in seconds, the job took executing"
   runTime: Float
   "The time, in seconds, the job spent sitting in the queue"
@@ -38,7 +38,7 @@ type Job {
   "Unique service ID"
   serviceId: String
   "Service creation date"
-  serviceCreationDate: Date
+  serviceCreationDate: DateTime
   "User who requested to job"
   user: User
   "Additional metadata attached to output files"
@@ -62,6 +62,33 @@ type Parameter {
   "Value of the parameter"
   value: ParameterValue!
   delimiter: String
+}
+
+type Service {
+  serviceId: ID!
+  version: String
+  created: DateTime
+  name: String
+  description: String
+  "Keywords relevant to the service"
+  keywords: [String]
+  "Whether input can be streamed through inputStream"
+  streamInput: Boolean
+  parameters: [ServiceParameter]
+}
+
+type ServiceParameter {
+  name: String
+  description: String
+  type: ParameterType
+  required: Boolean
+  fileType: FileType 
+}
+
+type FileType {
+  name: String
+  "Details of the file structure"
+  schema: FileSchema
 }
 
 type User {
@@ -109,7 +136,13 @@ enum OrderBy {
   submittedAt
 }
 
-scalar Date
+enum WorkerEventType {
+  started
+  stopped
+}
+
+scalar DateTime
+scalar FileSchema
 scalar ParameterValue
 
 input ParameterInput {
@@ -158,15 +191,28 @@ type RefreshResponse {
   token: String
 }
 
+type Event {
+  channel: String
+  message: String
+}
+
+type JobEvent {
+  jobId: ID
+  type: JobStatus
+  total: Int
+}
+
+type WorkerEvent {
+  workerId: ID
+  type: WorkerEventType
+  total: Int
+}
+
 type Query {
   job(jobId: ID!): Job
-  jobs(
-    status: JobStatus
-    service: String
-    order: Order
-    orderBy: OrderBy
-    limit: Int
-  ): [Job]
+  jobs(status: JobStatus, service: String): [Job]
+  service(name: String!, version: String, latest: Boolean): [Service]
+  services(query: String, latest: Boolean): [Service]
 }
 
 type Mutation {
@@ -177,8 +223,11 @@ type Mutation {
 }
 
 type Subscription {
-  subscribeJobMessages(jobId: ID!): String
+  subscribeEvent(event: String!): Event
+  subscribeJobs: JobEvent
   subscribeJobComplete(jobId: ID!): Job
+  subscribeJobMessages(jobId: ID!): String
+  subscribeWorkers: WorkerEvent
 }
 
 schema {
