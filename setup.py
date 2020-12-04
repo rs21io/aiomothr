@@ -8,6 +8,7 @@ setuptools.setup(
     version="0.2.1",
     author="James Arnold",
     author_email="james@rs21.io",
+    url="https://github.com/rs21io/aiomothr"
     description="Asynchronous client library for interacting with MOTHR",
     long_description=long_description,
     long_description_content_type="text/markdown",
