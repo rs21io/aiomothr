@@ -70,17 +70,19 @@ class TestJob:
     @patch("aiomothr.request.Client")
     async def test_subscribe(self, mock_client):
         mock_client.return_value.__aenter__.return_value.subscribe.return_value = (
-            AsyncIterator(["test"])
+            AsyncIterator([{"subscribeJobComplete": {"jobId": "test"}}])
         )
         request = AsyncJobRequest(service="test")
         result = await request.subscribe()
-        assert result == "test"
+        assert result["jobId"] == "test"
 
     @pytest.mark.asyncio
     @patch("aiomothr.request.Client")
     async def test_subscribe_messages(self, mock_client):
         mock_client.return_value.__aenter__.return_value.subscribe.return_value = (
-            AsyncIterator([f"message {i+1}" for i in range(10)])
+            AsyncIterator(
+                [{"subscribeJobMessages": f"message {i+1}"} for i in range(10)]
+            )
         )
         request = AsyncJobRequest(service="test")
         messages = [m async for m in request.subscribe_messages()]
@@ -91,11 +93,19 @@ class TestJob:
         request = AsyncJobRequest(service="test")
         request.add_input(value="s3://bucket/test.txt").add_output(
             value="s3://bucket/test.txt"
-        ).add_parameter(value="baz").add_output_metadata({"foo": "bar"})
-        assert len(request.req_args["parameters"]) == 3
+        ).add_parameter(value="bar").add_parameter(
+            name="-p", value="baz"
+        ).add_output_metadata(
+            {"foo": "bar"}
+        )
+        assert len(request.req_args["parameters"]) == 4
         assert request.req_args["parameters"][0]["type"] == "input"
         assert request.req_args["parameters"][1]["type"] == "output"
         assert request.req_args["parameters"][2]["type"] == "parameter"
+        assert request.req_args["parameters"][2]["value"] == "bar"
+        assert request.req_args["parameters"][2]["type"] == "parameter"
+        assert request.req_args["parameters"][3]["name"] == "-p"
+        assert request.req_args["parameters"][3]["value"] == "baz"
         assert request.req_args["outputMetadata"]["foo"] == "bar"
 
     def test_add_parameter_warn(self):

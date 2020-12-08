@@ -5,7 +5,7 @@
 from __future__ import annotations
 import asyncio
 import re
-from typing import Dict, List, Optional
+from typing import AsyncIterator, Dict, List, Optional
 from warnings import warn
 
 from gql import gql, Client
@@ -160,7 +160,7 @@ class AsyncJobRequest:
             fields=["jobId", "service", "status", "result", "error"]
         )
 
-    async def subscribe(self) -> str:
+    async def subscribe(self) -> Dict:
         """Subscribe to job"""
         s = gql(
             f"""
@@ -179,9 +179,9 @@ class AsyncJobRequest:
             transport=self.client.ws_transport, schema=self.client.schema
         ) as sess:
             result = [r async for r in sess.subscribe(s)]
-        return result[0]
+        return result[0]["subscribeJobComplete"]
 
-    async def subscribe_messages(self):
+    async def subscribe_messages(self) -> AsyncIterator[str]:
         """Subscribe to job messages"""
         s = gql(
             f"""
@@ -194,8 +194,7 @@ class AsyncJobRequest:
             transport=self.client.ws_transport, schema=self.client.schema
         ) as sess:
             async for result in sess.subscribe(s):
-                print(result)
-                yield result
+                yield result["subscribeJobMessages"]
 
     async def run_job(
         self, poll_frequency: float = 0.25, return_failed: bool = False
