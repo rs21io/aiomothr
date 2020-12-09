@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setuptools.setup(
     name="aiomothr",
-    version="0.2.1",
+    version="0.3.0",
     author="James Arnold",
     author_email="james@rs21.io",
     url="https://github.com/rs21io/aiomothr",
